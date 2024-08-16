@@ -11,63 +11,114 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-
   late final String _search = "";
   final int _offset = 0;
 
-  Future<Map> _getGifs() async {
-    http.Response response;
+  Future<Map<String, dynamic>> _getGifs() async {
+    final String url = _search.isEmpty
+        ? "https://api.giphy.com/v1/gifs/trending?api_key=R7D2pBUVOX8Rff7r4YVwPFWdZSCYjL41&limit=20&offset=75&rating=g&bundle=messaging_non_clips"
+        : "https://api.giphy.com/v1/gifs/search?api_key=R7D2pBUVOX8Rff7r4YVwPFWdZSCYjL41&q=$_search&limit=20&offset=$_offset&rating=g&lang=en&bundle=messaging_non_clips";
 
-    if (_search.isEmpty) {
-      response = await http.get(Uri.parse(
-          "https://api.giphy.com/v1/gifs/trending?api_key=R7D2pBUVOX8Rff7r4YVwPFWdZSCYjL41&limit=20&offset=75&rating=g&bundle=messaging_non_clips"));
+    final http.Response response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
     } else {
-      response = await http.get(Uri.parse(
-          "https://api.giphy.com/v1/gifs/search?api_key=R7D2pBUVOX8Rff7r4YVwPFWdZSCYjL41&q=$_search&limit=20&offset=$_offset&rating=g&lang=en&bundle=messaging_non_clips"));
-
+      throw Exception('Failed to load GIFs');
     }
-
-    return json.decode(response.body);
-
-    }
+  }
 
   @override
   void initState() {
     super.initState();
 
-    _getGifs().then((map){
+    _getGifs().then((map) {
       print(map);
     });
   }
-  
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.black,
-        title: Image.network("https://developers.giphy.com/branch/master/static/header-logo-0fec0225d189bc0eae27dac3e3770582.gif"),
+        title: Image.network(
+            "https://developers.giphy.com/branch/master/static/header-logo-0fec0225d189bc0eae27dac3e3770582.gif"),
         centerTitle: true,
       ),
       backgroundColor: Colors.black,
-      body: const SingleChildScrollView(
-        child: Column(
-          children: <Widget>[
-            Padding(
-              padding: EdgeInsets.all(15.0),
-              child: TextField(
-                decoration: InputDecoration(
-                  labelText: "Pesquise Aqui",
-                  labelStyle: TextStyle(color: Colors.white),
-                  border: OutlineInputBorder(),
-                ),
-                style: TextStyle(color: Colors.white, fontSize: 18.0),
-                textAlign: TextAlign.center,
+      body: Column(
+        children: <Widget>[
+          const Padding(
+            padding: EdgeInsets.all(15.0),
+            child: TextField(
+              decoration: InputDecoration(
+                labelText: "Pesquise Aqui",
+                labelStyle: TextStyle(color: Colors.white),
+                border: OutlineInputBorder(),
               ),
+              style: TextStyle(color: Colors.white, fontSize: 18.0),
+              textAlign: TextAlign.center,
             ),
-          ],
-        ),
-      )
+          ),
+          Expanded(
+            child: FutureBuilder<Map<String, dynamic>>(
+              future: _getGifs(),
+              builder: (context, snapshot) {
+                switch (snapshot.connectionState) {
+                  case ConnectionState.waiting:
+                  case ConnectionState.none:
+                    return const Center(
+                      child: SizedBox(
+                        width: 200.0,
+                        height: 200.0,
+                        child: CircularProgressIndicator(
+                          valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white),
+                          strokeWidth: 5.0,
+                        ),
+                      ),
+                    );
+                  default:
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    } else {
+                      return _createGifTable(context, snapshot.data);
+                    }
+                }
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _createGifTable(BuildContext context, Map<String, dynamic>? data) {
+    if (data == null || data["data"] == null) {
+      return const Center(child: Text('No GIFs found'));
+    }
+
+    final List<dynamic> gifs = data["data"];
+
+    return GridView.builder(
+      padding: const EdgeInsets.all(10.0),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2, // Número de colunas
+        crossAxisSpacing: 10.0, // Espaçamento horizontal
+        mainAxisSpacing: 10.0, // Espaçamento vertical
+      ),
+      itemCount: gifs.length,
+      itemBuilder: (context, index) {
+        final String imageUrl = gifs[index]["images"]["fixed_height"]["url"];
+        return GestureDetector(
+          child: Image.network(
+            imageUrl,
+            height: 300.0,
+            fit: BoxFit.cover,
+          ),
+        );
+      },
     );
   }
 }
