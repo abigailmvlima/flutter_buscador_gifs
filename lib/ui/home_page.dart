@@ -11,7 +11,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  late final String _search = "";
+  late String _search = "";
   final int _offset = 0;
 
   Future<Map<String, dynamic>> _getGifs() async {
@@ -49,16 +49,21 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.black,
       body: Column(
         children: <Widget>[
-          const Padding(
-            padding: EdgeInsets.all(15.0),
+          Padding(
+            padding: const EdgeInsets.all(15.0),
             child: TextField(
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: "Pesquise Aqui",
                 labelStyle: TextStyle(color: Colors.white),
                 border: OutlineInputBorder(),
               ),
-              style: TextStyle(color: Colors.white, fontSize: 18.0),
+              style: const TextStyle(color: Colors.white, fontSize: 18.0),
               textAlign: TextAlign.center,
+              onSubmitted: (text){
+               setState(() {
+                 _search = text;
+               });
+              },
             ),
           ),
           Expanded(
