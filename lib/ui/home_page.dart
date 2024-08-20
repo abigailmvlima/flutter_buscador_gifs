@@ -4,6 +4,7 @@ import 'package:buscador_gifs/ui/gif_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_share/flutter_share.dart';
 import 'package:http/http.dart' as http;
+import 'package:transparent_image/transparent_image.dart'; // Importação correta
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -14,17 +15,27 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late String _search = "";
-  final int _offset = 0;
+  int _offset = 0;
+  List<dynamic> _gifs = [];
+  bool _isLoadingMore = false;
 
-  Future<Map<String, dynamic>> _getGifs() async {
+  Future<void> _getGifs() async {
     final String url = _search.isEmpty
-        ? "https://api.giphy.com/v1/gifs/trending?api_key=R7D2pBUVOX8Rff7r4YVwPFWdZSCYjL41&limit=20&offset=75&rating=g&bundle=messaging_non_clips"
+        ? "https://api.giphy.com/v1/gifs/trending?api_key=R7D2pBUVOX8Rff7r4YVwPFWdZSCYjL41&limit=20&offset=$_offset&rating=g&bundle=messaging_non_clips"
         : "https://api.giphy.com/v1/gifs/search?api_key=R7D2pBUVOX8Rff7r4YVwPFWdZSCYjL41&q=$_search&limit=20&offset=$_offset&rating=g&lang=en&bundle=messaging_non_clips";
 
     final http.Response response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
-      return json.decode(response.body);
+      final Map<String, dynamic> data = json.decode(response.body);
+      setState(() {
+        if (_offset == 0) {
+          _gifs = data["data"];
+        } else {
+          _gifs.addAll(data["data"]);
+        }
+        _isLoadingMore = false;
+      });
     } else {
       throw Exception('Failed to load GIFs');
     }
@@ -33,10 +44,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-
-    _getGifs().then((map) {
-      print(map);
-    });
+    _getGifs();
   }
 
   @override
@@ -61,80 +69,67 @@ class _HomePageState extends State<HomePage> {
               ),
               style: const TextStyle(color: Colors.white, fontSize: 18.0),
               textAlign: TextAlign.center,
-              onSubmitted: (text){
-               setState(() {
-                 _search = text;
-               });
+              onSubmitted: (text) {
+                setState(() {
+                  _search = text;
+                  _offset = 0;
+                  _getGifs();
+                });
               },
             ),
           ),
           Expanded(
-            child: FutureBuilder<Map<String, dynamic>>(
-              future: _getGifs(),
-              builder: (context, snapshot) {
-                switch (snapshot.connectionState) {
-                  case ConnectionState.waiting:
-                  case ConnectionState.none:
-                    return const Center(
-                      child: SizedBox(
-                        width: 200.0,
-                        height: 200.0,
-                        child: CircularProgressIndicator(
-                          valueColor:
-                          AlwaysStoppedAnimation<Color>(Colors.white),
-                          strokeWidth: 5.0,
+            child: _gifs.isEmpty && !_isLoadingMore
+                ? const Center(child: Text('No GIFs found'))
+                : GridView.builder(
+              padding: const EdgeInsets.all(10.0),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10.0,
+                mainAxisSpacing: 10.0,
+              ),
+              itemCount: _search.isEmpty
+                  ? _gifs.length
+                  : _gifs.length + 1,
+              itemBuilder: (context, index) {
+                if (_search.isEmpty || index < _gifs.length) {
+                  final String imageUrl = _gifs[index]["images"]["fixed_height"]["url"];
+                  return GestureDetector(
+                    child: FadeInImage.memoryNetwork(
+                      placeholder: kTransparentImage, // Uso correto do placeholder
+                      image: imageUrl,
+                      height: 300.0,
+                      fit: BoxFit.cover,
+                    ),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GifPage(_gifs[index]),
                         ),
-                      ),
-                    );
-                  default:
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Error: ${snapshot.error}'));
-                    } else {
-                      return _createGifTable(context, snapshot.data);
-                    }
+                      );
+                    },
+                    onLongPress: () {
+                      FlutterShare.share(title: imageUrl);
+                    },
+                  );
+                } else {
+                  if (!_isLoadingMore) {
+                    _isLoadingMore = true;
+                    _offset += 19; // Ajuste o valor conforme necessário
+                    _getGifs();
+                  }
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  );
                 }
               },
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _createGifTable(BuildContext context, Map<String, dynamic>? data) {
-    if (data == null || data["data"] == null) {
-      return const Center(child: Text('No GIFs found'));
-    }
-
-    final List<dynamic> gifs = data["data"];
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(10.0),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, // Número de colunas
-        crossAxisSpacing: 10.0, // Espaçamento horizontal
-        mainAxisSpacing: 10.0, // Espaçamento vertical
-      ),
-      itemCount: gifs.length,
-      itemBuilder: (context, index) {
-        final String imageUrl = gifs[index]["images"]["fixed_height"]["url"];
-        return GestureDetector(
-          child: Image.network(
-            imageUrl,
-            height: 300.0,
-            fit: BoxFit.cover,
-          ),
-          onTap: () {
-            Navigator.push(context,
-              MaterialPageRoute(builder: (context) => GifPage(gifs[index]),
-            ),
-            );
-          },
-          onLongPress: () {
-            FlutterShare.share(title: gifs[index]["images"]["fixed_height"]["url"]);
-          },
-        );
-      },
     );
   }
 }
