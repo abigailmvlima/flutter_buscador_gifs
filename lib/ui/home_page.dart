@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:buscador_gifs/ui/gif_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_share/flutter_share.dart';
 import 'package:http/http.dart' as http;
 
 class HomePage extends StatefulWidget {
@@ -124,9 +125,13 @@ class _HomePageState extends State<HomePage> {
             fit: BoxFit.cover,
           ),
           onTap: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => GifPage(gifs[index]),
+            Navigator.push(context,
+              MaterialPageRoute(builder: (context) => GifPage(gifs[index]),
             ),
             );
+          },
+          onLongPress: () {
+            FlutterShare.share(title: gifs[index]["images"]["fixed_height"]["url"]);
           },
         );
       },
